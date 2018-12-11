@@ -22,8 +22,8 @@ from pathlib import Path
 def main():
 
     parser = get_parser()
-    SEGPATH = Path('/tungstenfs/groups/gbioinfo/carlsara/segmentation')
-    CLASSPATH = Path("/tungstenfs/groups/gbioinfo/carlsara/fastai/courses/dl1/data/yeast/")
+
+    MODELPATH = Path('./pretrained/')
 
     my_args=parser.parse_args()
 
@@ -31,12 +31,12 @@ def main():
     predict=my_args.predict
 
     if predict == 'full':
-        predict_seg(SEGPATH, IOPATH)
-        predict_freqs(IOPATH/'cropped', CLASSPATH)
+        predict_seg(MODELPATH, IOPATH)
+        predict_freqs(MODELPATH, IOPATH/'cropped')
     elif predict == 'seg':
-        predict_seg(SEGPATH, IOPATH)
+        predict_seg(MODELPATH, IOPATH)
     elif predict == 'freq':
-        predict_freqs(IOPATH, CLASSPATH)
+        predict_freqs(MODELPATH, IOPATH)
 
 
 def get_parser():
@@ -51,15 +51,12 @@ def get_parser():
     return parser
 
 
-def predict_seg(SEGPATH, IOPATH):
+def predict_seg(MODELPATH, IOPATH):
 
-    TRAIN_DN = 'train'
-    MASKS_DN = 'train_mask'
-
-    trn_x = list(sorted((SEGPATH/TRAIN_DN).iterdir()))
-    trn_y = list(sorted((SEGPATH/MASKS_DN).iterdir()))
-    val_x = list(sorted((SEGPATH/'val').iterdir()))
-    val_y = list(sorted((SEGPATH/'val_mask').iterdir()))
+    trn_x = list(sorted((MODELPATH/'segmentation/train').iterdir()))
+    trn_y = list(sorted((MODELPATH/'segmentation/train_mask').iterdir()))
+    val_x = list(sorted((MODELPATH/'segmentation/val').iterdir()))
+    val_y = list(sorted((MODELPATH/'segmentation/val_mask').iterdir()))
     test_x = list(IOPATH.iterdir())
 
 
@@ -151,8 +148,8 @@ def predict_seg(SEGPATH, IOPATH):
     wd=1e-7
 
     tfms = tfms_from_model(resnet34, sz, crop_type=CropType.CENTER, tfm_y=TfmType.CLASS, aug_tfms=aug_tfms)
-    datasets = ImageData.get_ds(MatchedFilesDataset, (trn_x,trn_y), (val_x,val_y), test=(test_x,test_x), tfms=tfms, path=SEGPATH)
-    md = ImageData(SEGPATH, datasets, bs, num_workers=16, classes=None)
+    datasets = ImageData.get_ds(MatchedFilesDataset, (trn_x,trn_y), (val_x,val_y), test=(test_x,test_x), tfms=tfms, path=MODELPATH/'segmentation')
+    md = ImageData(MODELPATH/'segmentation', datasets, bs, num_workers=16, classes=None)
     denorm = md.trn_ds.denorm
 
     m_base = get_base()
@@ -229,17 +226,17 @@ def predict_seg(SEGPATH, IOPATH):
 
 ## Now move onto classification with resnet34
 
-def predict_freqs(IOPATH, CLASSPATH):
+def predict_freqs(MODELPATH, IOPATH):
 
     sz=50
     arch=resnet34
     tfms = tfms_from_model(resnet34, sz, aug_tfms=transforms_top_down, max_zoom=1.1)
     test_path = IOPATH
 
-    data = ImageClassifierData.from_paths(CLASSPATH, tfms=tfms, bs=128, test_name=test_path)
+    data = ImageClassifierData.from_paths(MODELPATH/'classification', tfms=tfms, bs=128, test_name=test_path)
     learn = ConvLearner.pretrained(arch, data, precompute=False)
     learn.unfreeze()
-    learn.load(CLASSPATH/"models/multi5class_adaptive_lr") # best model so far - includes a class for multi-colony images
+    learn.load("multi5class_adaptive_lr") # best model so far - includes a class for multi-colony images
 
     # with TTA
     log_pred_test, y_test = learn.TTA(is_test=True)

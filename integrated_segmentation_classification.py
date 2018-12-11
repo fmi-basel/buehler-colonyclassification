@@ -32,11 +32,11 @@ def main():
 
     if predict == 'full':
         predict_seg(MODELPATH, IOPATH)
-        predict_freqs(MODELPATH, IOPATH/'cropped')
+        predict_freqs(MODELPATH, IOPATH)
     elif predict == 'seg':
         predict_seg(MODELPATH, IOPATH)
     elif predict == 'freq':
-        predict_freqs(MODELPATH, IOPATH)
+        predict_freqs_only(MODELPATH, IOPATH)
 
 
 def get_parser():
@@ -231,6 +231,62 @@ def predict_freqs(MODELPATH, IOPATH):
     sz=50
     arch=resnet34
     tfms = tfms_from_model(resnet34, sz, aug_tfms=transforms_top_down, max_zoom=1.1)
+    test_path = IOPATH/'cropped'  # Look for the cropped folder created by the previous step
+
+    data = ImageClassifierData.from_paths(MODELPATH/'classification', tfms=tfms, bs=128, test_name=test_path)
+    learn = ConvLearner.pretrained(arch, data, precompute=False)
+    learn.unfreeze()
+    learn.load("multi5class_adaptive_lr") # best model so far - includes a class for multi-colony images
+
+    # with TTA
+    log_pred_test, y_test = learn.TTA(is_test=True)
+    probs_test = np.mean(np.exp(log_pred_test),0)
+    preds_test = np.argmax(probs_test, axis=1)
+
+    test_filenames = data.test_ds.fnames
+
+    filenames = [ ]
+    for name in test_filenames:
+        m = re.search('(.+)_(\d+).jpg$', name)
+        if m:
+            filenames.append(m.groups()[0])
+
+    filenames = np.asarray(filenames, dtype=np.str)
+    unique_filenames = np.unique(filenames)
+
+
+    # Format output data table
+
+    full_df = pd.DataFrame()
+    for name in np.nditer(unique_filenames):
+        print(name)
+        ind = []
+        for tname in np.nditer(filenames):
+            ind.append(tname == name)
+        f_preds = preds_test[ind]
+        #print(f_preds)
+        f_vals, f_counts = np.unique(f_preds, return_counts=True)
+
+        f_ser = pd.Series(f_counts, index=f_vals)
+        f_df = pd.DataFrame(f_ser, index=[0,1,2,3,4], columns=[str(name)])
+        full_df = full_df.append(f_df.T)
+
+    full_df.columns = ['bad_seg', 'pink', 'red', 'var', 'white']
+    full_df = full_df.assign(Perc_white = full_df['white']/full_df.iloc[:,1:5].sum(axis=1), Perc_non_white = full_df.iloc[:,1:4].sum(axis=1)/full_df.iloc[:,1:5].sum(axis=1))
+
+    import datetime
+    timestamp = '{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now())
+    summary_filename = timestamp + '_summary.csv'
+
+    full_df.to_csv(IOPATH/summary_filename, na_rep="0")
+
+
+
+def predict_freqs_only(MODELPATH, IOPATH):
+
+    sz=50
+    arch=resnet34
+    tfms = tfms_from_model(resnet34, sz, aug_tfms=transforms_top_down, max_zoom=1.1)
     test_path = IOPATH
 
     data = ImageClassifierData.from_paths(MODELPATH/'classification', tfms=tfms, bs=128, test_name=test_path)
@@ -279,6 +335,7 @@ def predict_freqs(MODELPATH, IOPATH):
     summary_filename = timestamp + '_summary.csv'
 
     full_df.to_csv(IOPATH/summary_filename, na_rep="0")
+
 
 
 if __name__ == "__main__":

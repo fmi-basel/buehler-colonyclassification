@@ -15,21 +15,38 @@ The neural networks used in the pipeline are built using the `fastai` library. Y
 
 Download the pipeline by cloning the repository:
 
-```git clone https://github.com/fmi-basel/buehler-colonyclassification.git
+```
+git clone https://github.com/fmi-basel/buehler-colonyclassification.git
 ```
 
 The script needs to be able to find the `fastai` modules that you have installed. The simplest way to ensure this is to put a symbolic link to the `fastai` directory in the top level of the `buehler-colonyclassification` directory:
 
-```cd buehler-colonyclassification
-   ln -s /path/to/fastai ./ 
+```
+cd buehler-colonyclassification
+ln -s /path/to/fastai ./ 
 ```
 
 Test that everything is working by calling up the help menu:
 
-```python integrated_segmentation_classification.py --help
+```
+conda activate fastai
+python integrated_segmentation_classification.py --help
 ```
 
 
 ## Running the pipeline
 
+First, make sure that the images you want to process are in a readable folder. The path to this directory is the only required argument. 
 
+Basic usage:
+
+```
+python integrated_segmentation_classification.py --destdir "/path/to/my/images"
+```
+
+You can either run the whole pipeline (colony segmentation plus classification), or run each step separately (e.g. in case you have pre-segmented images). The default is to run the full pipeline. To run only one step, add the `--predict` or `-p` flag. Allowed values are "full" for the full pipeline, "seg" for segmentation only, or "freq" for classification frequencies only.
+
+```
+python integrated_segmentation_classification.py --destdir "/path/to/my/images" --predict seg 
+python integrated_segmentation_classification.py --destdir "/path/to/my/images" --predict freq
+```

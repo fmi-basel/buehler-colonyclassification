@@ -36,7 +36,7 @@ python integrated_segmentation_classification.py --help
 
 ## Running the pipeline
 
-First, make sure that the images you want to process are in a readable folder. The path to this directory is the only required argument. 
+First, make sure that the images you want to process are in a readable folder. Images should be in the .jpg format. The path to this directory is the only required argument. 
 
 Basic usage:
 
@@ -50,3 +50,22 @@ You can either run the whole pipeline (colony segmentation plus classification),
 python integrated_segmentation_classification.py --destdir "/path/to/my/images" --predict seg 
 python integrated_segmentation_classification.py --destdir "/path/to/my/images" --predict freq
 ```
+
+## Output
+
+A successful run of the full pipeline will create two main outputs: a folder called "cropped" within the original image folder containing cropped images of each individual colony identified by the segmentation, and a CSV file named with the date and time of completion containing a summary of the classification results. The CSV file can be opened with Excel, and it contains one row per original plate image. The columns are as follows:
+
+* bad_seg: Count of the number of colonies that were badly segmented (e.g. too small or multiple colonies per cropped image); these are excluded from further analysis.
+* pink: Count of the number of predicted pink colonies
+* red: Count of the number of predicted red colonies
+* var: Count of the number of predicted variegating colonies
+* white: Count of the number of predicted white colonies
+* Perc_white: Percentage of white colonies on the plate. Defined as (white) / (white + pink + red + var).
+* Perc_non_white: Percentage of non-white colonies on the plate. Defined as (pink + red + var) / (white + pink + red + var).
+
+In general the percentage of non-white colonies is more accurate than individual predictions of red, pink, or variegating colonies. 
+
+Please note that exact numbers may vary if the pipeline is run multiple times on the same data, as the neural network predictions are not deterministic.
+
+
+

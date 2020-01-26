@@ -183,16 +183,19 @@ def predict_seg(MODELPATH, IOPATH):
         "Function to crop center of an image file"
         img_pre= imread(fn)
         ysize, xsize, chan = img_pre.shape
-        mindim = np.argmin([ysize, xsize])
-        if mindim == 0: 
-          diff = xsize - ysize
-          offset = diff // 2
-          img= img_pre[:,offset:-offset]
-        elif mindim == 1:
-          diff = ysize - xsize
-          offset = diff // 2
-          img= img_pre[:,offset:-offset]          
-        return img
+        if ysize == xsize:
+          return img_pre
+        else:
+          mindim = np.argmin([ysize, xsize])
+          if mindim == 0: 
+            diff = xsize - ysize
+            offset = diff // 2
+            img= img_pre[:,offset:-offset]
+          elif mindim == 1:
+            diff = ysize - xsize
+            offset = diff // 2
+            img= img_pre[offset:-offset,:]          
+          return img
 
     cropped = np.empty([n_img,dim,dim,3], dtype="uint8")
     for i in range(0,n_img):

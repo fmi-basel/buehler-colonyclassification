@@ -10,6 +10,7 @@ import os
 import re
 import pandas as pd
 import sys, argparse
+import numpy as np
 
 from skimage.segmentation import clear_border
 from skimage.transform import resize
@@ -182,9 +183,15 @@ def predict_seg(MODELPATH, IOPATH):
         "Function to crop center of an image file"
         img_pre= imread(fn)
         ysize, xsize, chan = img_pre.shape
-        diff = xsize - ysize
-        offset = diff // 2
-        img= img_pre[:,offset:-offset]
+        mindim = np.argmin([ysize, xsize])
+        if mindim == 0: 
+          diff = xsize - ysize
+          offset = diff // 2
+          img= img_pre[:,offset:-offset]
+        elif mindim == 1:
+          diff = ysize - xsize
+          offset = diff // 2
+          img= img_pre[:,offset:-offset]          
         return img
 
     cropped = np.empty([n_img,dim,dim,3], dtype="uint8")

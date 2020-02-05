@@ -17,7 +17,7 @@ from skimage.transform import resize
 from skimage.io import *
 from skimage.morphology import *
 from skimage.measure import *
-
+from PIL import Image
 from pathlib import Path
 
 def main():
@@ -169,77 +169,60 @@ def predict_seg(MODELPATH, IOPATH):
 
     # Futher image processing steps
 
-    n_img = py.shape[0]
-    orig = imread(test_x[0])
-    dim = min(orig.shape[0], orig.shape[1])
-
-    mask_upscaled = np.empty([n_img, dim, dim])
-    for i in range(0, n_img):
-        mask_upscaled[i] = resize(py[i], (dim, dim), preserve_range=True)
-
-    # get original image, center crop to match
-
-    def cropimread(fn):
-        "Function to crop center of an image file"
-        img_pre= imread(fn)
+    def preprocess_image(fn, pn):
+        img_pre = imread(fn)
         ysize, xsize, chan = img_pre.shape
+        
+        # Center crop
         if ysize == xsize:
-          return img_pre
+            cropped = img_pre
+            dim = ysize
         else:
-          mindim = np.argmin([ysize, xsize])
-          if mindim == 0: 
-            diff = xsize - ysize
-            if diff % 2 == 0:
-            	offset = diff // 2
-            	img = img_pre[:,offset:-offset]
-            else:
-            	offset1 = diff // 2
-            	offset2 = offset1 + 1
-            	img = img_pre[:,offset1:-offset2]
-          elif mindim == 1:
-            diff = ysize - xsize
-            if diff % 2 == 0:
-            	offset = diff // 2
-            	img = img_pre[offset:-offset,:]
-            else:
-            	offset1 = diff // 2
-            	offset2 = offset1 + 1
-            	img = img_pre[offset1:-offset2,:]        
-          return img
+            mindim = np.argmin([ysize, xsize])
+            dim = min(ysize, xsize)
+            if mindim == 0: 
+                diff = xsize - ysize
+                if diff % 2 == 0:
+                    offset = diff // 2
+                    cropped = img_pre[:,offset:-offset]
+                else:
+                    offset1 = diff // 2
+                    offset2 = offset1 + 1
+                    cropped = img_pre[:,offset1:-offset2]
+            elif mindim == 1:
+                diff = ysize - xsize
+                if diff % 2 == 0:
+                    offset = diff // 2
+                    cropped = img_pre[offset:-offset,:]
+                else:
+                    offset1 = diff // 2
+                    offset2 = offset1 + 1
+                    cropped = img_pre[offset1:-offset2,:]        
+          
+         # morphological preprocessing
+        mask_upscaled = resize(pn, (dim, dim), preserve_range=True)
+        bool_cleared = clear_border(mask_upscaled>0)
+        morphFilt = opening(bool_cleared, disk(8))
+        label_reg = label(morphFilt)
+        props_reg = regionprops(label_reg)
+        return(cropped, dim, props_reg)
 
-    cropped = np.empty([n_img,dim,dim,3], dtype="uint8")
-    for i in range(0,n_img):
-        cropped[i] = cropimread(test_x[i])
-
-    bool_cleared = np.empty([n_img, dim, dim], dtype="uint8")
-    for i in range(0,n_img):
-        bool_cleared[i] = clear_border(mask_upscaled[i]>0)
-
-    morphFilt = np.empty([n_img, dim, dim])
-    for i in range(0,n_img):
-        morphFilt[i] = opening(bool_cleared[i], disk(8))
-
-    label_reg = np.empty([n_img, dim, dim], dtype="uint32")
-    for i in range(0,n_img):
-        label_reg[i] = label(morphFilt[i])
-
-    props_reg = [[] for i in range(0,n_img)]
-    for i in range(0, n_img):
-        props_reg[i] = regionprops(label_reg[i])
 
     # Set output directory name
     CROPPATH = IOPATH/'cropped'
     if not os.path.exists(CROPPATH):
         os.makedirs(CROPPATH)
 
+    n_img = py.shape[0]
 
     for i in range(0,n_img):
         k = 0
-        my_regs = [region for region in props_reg[i] if region.eccentricity <= 0.6 and region.area >= 400]
+        cropped, dim, props_reg = preprocess_image(test_x[i], py[i])
+        my_regs = [region for region in props_reg if region.eccentricity <= 0.6 and region.area >= 400]
         for region in my_regs:
             k += 1
             minr, minc, maxr, maxc = region.bbox
-            crop = cropped[i][minr:maxr, minc:maxc, :]
+            crop = cropped[minr:maxr, minc:maxc, :]
             imname = test_x[i].stem + "_" + str(k) + ".jpg"
             plt.imsave(CROPPATH/imname, crop)
 

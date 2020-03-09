@@ -58,7 +58,7 @@ def predict_seg(MODELPATH, IOPATH):
     trn_y = list(sorted((MODELPATH/'segmentation/train_mask').iterdir()))
     val_x = list(sorted((MODELPATH/'segmentation/val').iterdir()))
     val_y = list(sorted((MODELPATH/'segmentation/val_mask').iterdir()))
-    test_x = list(IOPATH.iterdir())
+    test_x = list(p for p in IOPATH.iterdir() if (p.suffix == ".jpg" or p.suffix == ".jpeg"))
 
 
     class MatchedFilesDataset(FilesDataset):
